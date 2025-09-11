@@ -1,0 +1,7 @@
+[
+  {"id":301,"estudianteId":1,"fecha":"2025-08-18","tipo":"Positivo","detalle":"Participación destacada en clase."},
+  {"id":302,"estudianteId":2,"fecha":"2025-08-19","tipo":"Llamado","detalle":"Olvidó la tarea por segunda vez."},
+  {"id":303,"estudianteId":3,"fecha":"2025-08-20","tipo":"Positivo","detalle":"Participación destacada en clase."},
+  {"id":304,"estudianteId":4,"fecha":"2025-08-21","tipo":"Llamado","detalle":"Olvidó la tarea por segunda vez."},
+  {"id":305,"estudianteId":5,"fecha":"2025-08-22","tipo":"Positivo","detalle":"Participación destacada en clase."}
+]

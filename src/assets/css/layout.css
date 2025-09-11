@@ -1,0 +1,198 @@
+/* ==================== */
+/*   LAYOUT PRINCIPAL - GRID RESPONSIVO
+/* ==================== */
+
+/* Contenedor principal que define el grid */
+.layout-container {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 250px 1fr;
+  grid-template-areas:
+    "sidebar header"
+    "sidebar main";
+  min-height: 100vh;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* ==================== */
+/*   HEADER (fijo arriba) */
+/* ==================== */
+
+.app-header {
+  grid-area: header;
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 250px; /* Alineado con el ancho del sidebar */
+  height: 60px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-lg);
+  z-index: 1000;
+  box-shadow: var(--shadow-sm);
+  transition: left 0.3s ease;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+}
+
+.app-header .logo img {
+  height: 36px;
+}
+
+.header-user {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  background: var(--bg-light);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+}
+
+/* ==================== */
+/*   SIDEBAR (fijo a la izquierda) */
+/* ==================== */
+
+.sidebar {
+  grid-area: sidebar;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 250px;
+  height: 100vh;
+  background: var(--bg-white);
+  border-right: 1px solid var(--border-color);
+  padding: 70px 0 20px 0; /* Espacio para el header + padding inferior */
+  z-index: 999;
+  overflow-y: auto;
+  transition: transform 0.3s ease;
+  font-weight: var(--font-weight-medium);
+}
+
+.sidebar ul {
+  list-style: none;
+}
+
+.sidebar li {
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar a {
+  display: block;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  text-decoration: none;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  transition: background 0.2s, color 0.2s;
+  border-left: 4px solid transparent;
+}
+
+.sidebar a:hover {
+  background: var(--bg-light);
+  color: var(--color-primary);
+}
+
+.sidebar a.is-active {
+  background: #e6f7ee;
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+  border-left-color: var(--color-primary);
+}
+
+/* ==================== */
+/*   MAIN (área de contenido) */
+/* ==================== */
+
+.main-content {
+  grid-area: main;
+  margin-left: 250px; /* Compensa el sidebar fijo */
+  padding: 80px var(--spacing-lg) var(--spacing-lg);
+  min-height: 100vh;
+  background: var(--bg-gray-light);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content h1 {
+  color: var(--color-secondary);
+  margin-bottom: var(--spacing-md);
+  font-size: var(--font-size-xl);
+}
+
+/* ==================== */
+/*   RESPONSIVE: Menú hamburguesa (mobile) */
+/* ==================== */
+
+@media (max-width: 991.98px) {
+  .app-header {
+    left: 0;
+    transition: left 0.3s ease;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 80px var(--spacing-md) var(--spacing-lg);
+  }
+
+  /* Clase que se puede agregar con JavaScript para mostrar el menú */
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Opcional: overlay oscuro sobre el contenido cuando el menú está abierto */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 998;
+  }
+
+  .sidebar-overlay.active {
+    display: block;
+  }
+}
+
+/* ==================== */
+/*   UTILIDADES DE DISEÑO */
+/* ==================== */
+
+/* Para pantallas grandes, mantener el estilo */
+@media (min-width: 992px) {
+  .layout-container {
+    grid-template-columns: 250px 1fr;
+  }
+}
+
+/* Ajuste para pantallas pequeñas (móviles) */
+@media (max-width: 576px) {
+  .main-content {
+    padding: 70px var(--spacing-sm) var(--spacing-lg);
+  }
+
+  .app-header {
+    padding: 0 var(--spacing-sm);
+  }
+
+  .app-header .logo img {
+    height: 32px;
+  }
+
+  .header-user {
+    font-size: var(--font-size-xs);
+    padding: 4px 8px;
+  }
+}
