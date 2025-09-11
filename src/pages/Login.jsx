@@ -8,8 +8,7 @@ export default function Login() {
         <h1 style={{marginBottom:'0.5rem'}}>Plataforma MonteVerde</h1>
         
         <img 
-          src="/logo-monteverde.png" 
-          alt="Colegio MonteVerde" 
+          src={`${import.meta.env.BASE_URL}logo-monteverde.png`} alt="Escudo"
           style={{ 
             width: '120px', 
             height: 'auto', 
