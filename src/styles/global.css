@@ -325,3 +325,15 @@ li { margin-bottom: var(--spacing-2xs); color: var(--text); }
 .role-btn.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 
 .submit-btn { width: 100%; margin-top: 20px; padding: 14px; font-size: var(--font-size-md); font-weight: var(--fw-bold); border-radius: var(--radius); }
+
+.card {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  transform: translateZ(0); /* fuerza render en GPU */
+}
+
+.card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
