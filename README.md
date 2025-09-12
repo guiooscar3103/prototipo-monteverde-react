@@ -43,8 +43,8 @@ El objetivo es desarrollar una plataforma web de gestión académica para docent
 
 Clonar este repositorio:
 
-git clone https://github.com/guiooscar/monteverde-frontend.git
-cd monteverde-frontend
+git clone https://github.com/guiooscar3103/prototipo-monteverde-react.git
+
 
 Instalar dependencias:
 
@@ -61,15 +61,20 @@ El proyecto se abrirá en http://localhost:5173
 ---
 ##  Estructura del Proyecto
 
+```plaintext
 src/
  ├─ components/     # Componentes reutilizables (Card, Tabla, Header, etc.)
  ├─ layouts/        # Layouts principales (Docente y Familia)
- ├─ pages/          # Páginas por perfil docente, familia y login (, Registro, Reporte, etc.)
+ ├─ pages/          # Páginas por perfil (docente, familia y login)
+ │   ├─ docente/    # Registro, Asistencia, Observador, Mensajes
+ │   └─ familia/    # Reporte, Mensajes
  ├─ mocks/          # Datos simulados en JSON
  ├─ services/       # apiFake para consumir mocks
  ├─ styles/         # Estilos globales
  ├─ App.jsx         # Definición de rutas
  └─ main.jsx        # Punto de entrada
+```
+
 
 ##  Estructura del Proyecto
 
