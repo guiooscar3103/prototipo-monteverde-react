@@ -1,29 +1,50 @@
-export default function Tabla({ columns=[], rows=[] }) {
+// src/components/Tabla.jsx
+
+export default function Tabla({ columns = [], rows = [] }) {
   return (
-    <div style={{overflowX:'auto'}}>
-      <table style={{width:'100%', borderCollapse:'collapse'}}>
-        <thead>
+    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
+      <thead>
+        <tr>
+          {columns.map(col => (
+            <th
+              key={col.key}
+              style={{
+                border: '1px solid #ddd',
+                padding: '0.5rem',
+                backgroundColor: '#f8f9fa',
+                textAlign: 'left'
+              }}
+            >
+              {col.label || col.header}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 ? (
           <tr>
-            {columns.map(col => (
-              <th key={col.key} style={{textAlign:'left', borderBottom:'1px solid #ddd', padding:'.5rem'}}>{col.header}</th>
-            ))}
+            <td colSpan={columns.length} style={{ textAlign: 'center', padding: '1rem' }}>
+              Sin datos
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} style={{borderBottom:'1px solid #f1f1f1'}}>
+        ) : (
+          rows.map((row, idx) => (
+            <tr key={idx}>
               {columns.map(col => (
-                <td key={col.key} style={{padding:'.5rem'}}>
-                  {col.render ? col.render(r) : r[col.key]}
+                <td
+                  key={col.key}
+                  style={{
+                    border: '1px solid #ddd',
+                    padding: '0.5rem'
+                  }}
+                >
+                  {col.render ? col.render(row[col.key], row) : row[col.key]}
                 </td>
               ))}
             </tr>
-          ))}
-          {rows.length===0 && (
-            <tr><td colSpan={columns.length} style={{padding:'1rem', opacity:.7}}>Sin datos</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  )
+          ))
+        )}
+      </tbody>
+    </table>
+  );
 }
