@@ -104,13 +104,7 @@
     }
   ],
   "observaciones": [
-    {
-      "id": "1",
-      "estudianteId": 101,
-      "fecha": "2025-04-05",
-      "tipo": "Positivo",
-      "detalle": "Participación activa en clase"
-    },
+   
     {
       "id": "7c92",
       "estudianteId": 101,
@@ -118,6 +112,7 @@
       "tipo": "Positivo",
       "detalle": "participa activamente en clase"
     }
+
   ],
   "mensajes": [
     {
@@ -127,9 +122,9 @@
       "rolEmisor": "docente",
       "rolReceptor": "familia",
       "asunto": "Falta de tareas",
-      "cuerpo": "Su hijo no ha entregado las últimas 3 tareas.",
+      "cuerpo": "Su hija no ha entregado las últimas 3 tareas de matemáticas.",
       "fecha": "2025-04-05",
-      "leido": false
+      "leido": true
     }
   ]
 }

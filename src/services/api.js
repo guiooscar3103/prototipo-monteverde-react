@@ -180,7 +180,7 @@ export const getObservadorPorCurso = async (cursoId) => {
   if (!res.ok) throw new Error('Error al obtener observaciones');
   const todas = await res.json();
 
-  const filtradas = todas.filter(o => estIds.includes(o.estudianteId));
+  const filtradas = todas.filter(o => String(estIds).includes(String(o.estudianteId)));
   return filtradas;
 };
 
@@ -203,5 +203,91 @@ export const agregarAnotacion = async (anotacion) => {
 export const getEstudiantes = async () => {
   const res = await fetch(`${API_BASE_URL}/estudiantes`);
   if (!res.ok) throw new Error('Error al obtener estudiantes');
+  return await res.json();
+};
+
+/**
+ * Obtiene mensajes por usuario (enviados y recibidos)
+ */
+export const getMensajesPorUsuario = async (usuarioId) => {
+  const res = await fetch(`${API_BASE_URL}/mensajes`);
+  if (!res.ok) throw new Error('Error al obtener mensajes');
+  
+  const todos = await res.json();
+  
+  // Filtrar mensajes donde el usuario es emisor o receptor
+  const filtrados = todos.filter(m => 
+    m.emisorId == usuarioId || m.receptorId == usuarioId
+  );
+  
+  return filtrados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+};
+
+/**
+ * Obtiene conversación entre dos usuarios
+ */
+export const getConversacion = async (usuario1Id, usuario2Id) => {
+  const res = await fetch(`${API_BASE_URL}/mensajes`);
+  if (!res.ok) throw new Error('Error al obtener mensajes');
+  
+  const todos = await res.json();
+  
+  const conversacion = todos.filter(m => 
+    (m.emisorId == usuario1Id && m.receptorId == usuario2Id) ||
+    (m.emisorId == usuario2Id && m.receptorId == usuario1Id)
+  );
+  
+  return conversacion.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+};
+
+/**
+ * Envía un nuevo mensaje
+ */
+export const enviarMensaje = async (mensaje) => {
+  const nuevoMensaje = {
+    ...mensaje,
+    fecha: new Date().toISOString().split('T')[0],
+    leido: false
+  };
+  
+  const res = await fetch(`${API_BASE_URL}/mensajes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(nuevoMensaje)
+  });
+  
+  if (!res.ok) throw new Error('Error al enviar mensaje');
+  return await res.json();
+};
+
+/**
+ * Marca un mensaje como leído
+ */
+export const marcarComoLeido = async (mensajeId) => {
+  const res = await fetch(`${API_BASE_URL}/mensajes/${mensajeId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ leido: true })
+  });
+  
+  if (!res.ok) throw new Error('Error al marcar mensaje como leído');
+  return await res.json();
+};
+
+/**
+ * Obtiene usuarios por rol (para listar destinatarios)
+ */
+export const getUsuariosPorRol = async (rol) => {
+  const res = await fetch(`${API_BASE_URL}/usuarios?rol=${rol}`);
+  if (!res.ok) throw new Error('Error al obtener usuarios');
+  return await res.json();
+};
+
+/**
+ * Obtiene información de un usuario por ID
+ */
+export const getUsuarioPorId = async (usuarioId) => {
+  const res = await fetch(`${API_BASE_URL}/usuarios/${usuarioId}`);
+  if (!res.ok) throw new Error('Error al obtener usuario');
   return await res.json();
 };
