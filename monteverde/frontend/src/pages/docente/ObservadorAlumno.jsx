@@ -1,9 +1,9 @@
-// src/pages/docente/ObservadorAlumno.jsx
-
 import { useEffect, useMemo, useState } from 'react';
 import Tabla from '../../components/Tabla';
 import SelectSimple from '../../components/SelectSimple';
 import BarraTitulo from '../../components/BarraTitulo';
+import Card from '../../components/Card';
+import { useAuth } from '../../hooks/useAuth';
 import {
   getCursos,
   getEstudiantesPorCurso,
@@ -11,72 +11,81 @@ import {
   agregarAnotacion
 } from '../../services/api';
 
+const TIPOS_OBSERVACION = [
+  { value: 'POSITIVA', label: 'Positiva' },
+  { value: 'NEGATIVA', label: 'Llamado de Atención' },
+  { value: 'NEUTRAL', label: 'Seguimiento' },
+  { value: 'DISCIPLINARIA', label: 'Disciplinaria' }
+];
+
 export default function ObservadorAlumno() {
+  const { usuario } = useAuth();
   const [cursoId, setCursoId] = useState('');
   const [anotaciones, setAnotaciones] = useState([]);
-  const [estudiantes, setEstudiantes] = useState([]); // Cambiado para manejar datos completos
+  const [estudiantes, setEstudiantes] = useState([]);
   const [form, setForm] = useState({
     estudianteId: '',
     fecha: new Date().toISOString().slice(0, 10),
-    tipo: 'Positivo',
+    tipo: 'POSITIVA',
     detalle: ''
   });
 
   const [cursosOptions, setCursosOptions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const [mensaje, setMensaje] = useState('');
 
-  // Cargar cursos al montar
+  // Cargar cursos
   useEffect(() => {
     const cargarCursos = async () => {
       try {
-        setError(null);
+        console.log('📚 Cargando cursos...');
         const cursos = await getCursos();
-        const cursosOpts = cursos.map(c => ({ 
-          value: String(c.id), // Convertir a string para consistencia
-          label: c.nombre 
-        }));
+        console.log('📚 Cursos obtenidos:', cursos);
         
-        setCursosOptions(cursosOpts);
+        setCursosOptions(cursos.map(c => ({ 
+          value: c.id.toString(),
+          label: c.nombre 
+        })));
         
         if (cursos.length > 0) {
-          setCursoId(String(cursos[0].id));
+          setCursoId(cursos[0].id.toString());
         }
       } catch (error) {
-        console.error('Error al cargar cursos:', error);
-        setError('Error al cargar los cursos');
+        console.error('❌ Error al cargar cursos:', error);
+        setMensaje('❌ Error al cargar los cursos');
       }
     };
     cargarCursos();
   }, []);
 
-  // Cargar anotaciones y estudiantes cuando cambie el curso
+  // Cargar datos del curso
   useEffect(() => {
-    const cargarDatos = async () => {
-      if (!cursoId) {
-        setAnotaciones([]);
-        setEstudiantes([]);
-        return;
-      }
+    if (!cursoId) return;
 
+    const cargarDatos = async () => {
       setLoading(true);
-      setError(null);
+      setMensaje('');
       
       try {
-        console.log('Cargando datos para curso:', cursoId); // Debug
+        console.log('🔍 Cargando datos para curso:', cursoId);
         
-        const [anotacionesData, estudiantesData] = await Promise.all([
-          getObservadorPorCurso(Number(cursoId)), // Convertir a number para la API
-          getEstudiantesPorCurso(Number(cursoId))
-        ]);
-
-        console.log('Anotaciones cargadas:', anotacionesData); // Debug
-        console.log('Estudiantes cargados:', estudiantesData); // Debug
-
-        setAnotaciones(anotacionesData || []);
+        // Cargar estudiantes
+        const estudiantesData = await getEstudiantesPorCurso(parseInt(cursoId));
+        console.log('👥 Estudiantes cargados:', estudiantesData);
         setEstudiantes(estudiantesData || []);
 
-        // Limpiar formulario cuando cambie de curso
+        // Cargar observaciones
+        try {
+          const anotacionesData = await getObservadorPorCurso(parseInt(cursoId));
+          console.log('📝 Observaciones cargadas:', anotacionesData);
+          setAnotaciones(anotacionesData || []);
+        } catch (obsError) {
+          console.warn('⚠️ No se pudieron cargar observaciones:', obsError);
+          setAnotaciones([]);
+        }
+
+        // Resetear estudiante seleccionado
         setForm(prev => ({
           ...prev,
           estudianteId: '',
@@ -84,10 +93,8 @@ export default function ObservadorAlumno() {
         }));
 
       } catch (error) {
-        console.error('Error al cargar datos del curso:', error);
-        setError('Error al cargar los datos del curso');
-        setAnotaciones([]);
-        setEstudiantes([]);
+        console.error('❌ Error general:', error);
+        setMensaje('❌ Error al cargar datos: ' + error.message);
       } finally {
         setLoading(false);
       }
@@ -96,193 +103,299 @@ export default function ObservadorAlumno() {
     cargarDatos();
   }, [cursoId]);
 
-  // Opciones de estudiantes para el select
   const estOptions = useMemo(() => {
-    return estudiantes.map(e => ({ 
-      value: String(e.id), 
+    const options = estudiantes.map(e => ({ 
+      value: e.id.toString(), 
       label: e.nombre 
     }));
+    console.log('📋 Opciones de estudiantes generadas:', options);
+    return options;
   }, [estudiantes]);
 
-  // Preparar filas para la tabla - CORREGIDO
   const filas = useMemo(() => {
-    if (!anotaciones.length || !estudiantes.length) {
-      return [];
-    }
-
-    return anotaciones.map(a => {
-      // Buscar el estudiante por ID, manejando tanto string como number
-      const estudiante = estudiantes.find(est => 
-        String(est.id) === String(a.estudianteId)
-      );
-      
-      return {
-        ...a,
-        estudiante: estudiante ? estudiante.nombre : `ID: ${a.estudianteId}`
-      };
-    });
-  }, [anotaciones, estudiantes]); // Dependencias correctas
+    const filasGeneradas = anotaciones.map(a => ({
+      id: a.id,
+      fecha: a.fecha,
+      estudiante: a.estudiante_nombre || `ID: ${a.estudianteId}`,
+      tipo: a.tipo,
+      detalle: a.detalle
+    }));
+    console.log('📊 Filas para tabla:', filasGeneradas);
+    return filasGeneradas;
+  }, [anotaciones]);
 
   const columnas = [
     { key: 'fecha', header: 'Fecha' },
     { key: 'estudiante', header: 'Estudiante' },
-    { key: 'tipo', header: 'Tipo' },
-    { key: 'detalle', header: 'Detalle' }
+    { 
+      key: 'tipo', 
+      header: 'Tipo',
+      render: (valor) => {
+        const colores = {
+          'POSITIVA': '#28a745',
+          'NEGATIVA': '#dc3545', 
+          'NEUTRAL': '#6c757d',
+          'DISCIPLINARIA': '#fd7e14'
+        };
+        return (
+          <span style={{ color: colores[valor] || '#666', fontWeight: 'bold' }}>
+            {valor}
+          </span>
+        );
+      }
+    },
+    { 
+      key: 'detalle', 
+      header: 'Detalle',
+      render: (valor) => (
+        <div style={{ maxWidth: '300px', wordWrap: 'break-word' }}>
+          {valor}
+        </div>
+      )
+    }
   ];
 
+  // ✅ Función agregar SUPER SIMPLE
   const agregar = async () => {
-    if (!cursoId || !form.estudianteId || !form.detalle.trim()) {
-      alert('Completa curso, estudiante y detalle.');
+    console.log('🔴🔴🔴 BOTÓN PRESIONADO!!! 🔴🔴🔴');
+    console.log('📝 Form completo:', form);
+    console.log('👤 Usuario:', usuario);
+    
+    // Validación simple
+    if (!form.estudianteId || !form.detalle.trim()) {
+      console.log('❌ Validación falló');
+      alert('Por favor selecciona un estudiante y escribe un detalle');
       return;
     }
 
+    console.log('✅ Validación OK, enviando...');
+    
     try {
-      setError(null);
+      setGuardando(true);
       
-      await agregarAnotacion({
-        estudianteId: Number(form.estudianteId), // Convertir a number
+      const datosAEnviar = {
+        estudianteId: parseInt(form.estudianteId),
+        docenteId: usuario?.id || 2,
         fecha: form.fecha,
         tipo: form.tipo,
-        detalle: form.detalle
-      });
+        detalle: form.detalle.trim()
+      };
+      
+      console.log('📤 Enviando:', datosAEnviar);
 
-      // Recargar anotaciones
-      const nuevasAnotaciones = await getObservadorPorCurso(Number(cursoId));
-      setAnotaciones(nuevasAnotaciones || []);
+      await agregarAnotacion(datosAEnviar);
+      console.log('✅ Observación enviada exitosamente');
+
+      alert('✅ Observación agregada correctamente');
       
-      // Limpiar solo el detalle
-      setForm(prev => ({ ...prev, detalle: '' }));
+      // Limpiar formulario
+      setForm(prev => ({ 
+        ...prev, 
+        detalle: '',
+        estudianteId: '' 
+      }));
       
-      alert('Anotación agregada correctamente');
+      // Recargar observaciones
+      const nuevasObs = await getObservadorPorCurso(parseInt(cursoId));
+      setAnotaciones(nuevasObs || []);
+      
     } catch (error) {
-      console.error('Error al agregar anotación:', error);
-      setError('Error al agregar anotación: ' + error.message);
-      alert('Error al agregar anotación: ' + error.message);
+      console.error('❌ ERROR COMPLETO:', error);
+      alert('❌ Error: ' + error.message);
+    } finally {
+      setGuardando(false);
     }
   };
 
+  const cursoActual = cursosOptions.find(c => c.value === cursoId);
+  
+  // Debug: Estado del botón
+  const botonHabilitado = !guardando && !!form.estudianteId && !!form.detalle.trim();
+  console.log('🔘 Estado del botón:', {
+    habilitado: botonHabilitado,
+    guardando,
+    tieneEstudiante: !!form.estudianteId,
+    tieneDetalle: !!form.detalle.trim(),
+    form
+  });
+
   return (
-    <div>
-      <BarraTitulo titulo="Observador del Alumno" subtitulo="Docente" />
+    <div className="grid">
+      <BarraTitulo 
+        titulo="Observador del Alumno" 
+        subtitulo="Registrar observaciones y seguimiento de estudiantes"
+        derecha={
+          <div style={{ fontSize: '0.9rem', textAlign: 'right', color: '#666' }}>
+            {cursoActual && (
+              <>
+                <div><strong>{cursoActual.label}</strong></div>
+                <div>Total: {anotaciones.length} observaciones</div>
+              </>
+            )}
+          </div>
+        }
+      />
+
       
-      <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem' }}>
+
+      {/* Mensajes */}
+      {mensaje && (
+        <div style={{ 
+          padding: '0.75rem 1rem',
+          backgroundColor: mensaje.includes('✅') ? '#d4edda' : '#f8d7da',
+          color: mensaje.includes('✅') ? '#155724' : '#721c24',
+          border: '1px solid',
+          borderRadius: '6px',
+          marginBottom: '1rem',
+          textAlign: 'center'
+        }}>
+          {mensaje}
+        </div>
+      )}
+
+      {/* Selector de curso */}
+      <Card title="Seleccionar Curso">
         <SelectSimple
           value={cursoId}
-          onChange={setCursoId}
+          onChange={(valor) => {
+            console.log('📚 Curso cambiado a:', valor);
+            setCursoId(valor);
+          }}
           options={cursosOptions}
           etiqueta="Curso"
         />
-      </div>
+      </Card>
 
-      {error && (
-        <div style={{ 
-          backgroundColor: '#ffebee', 
-          color: '#c62828', 
-          padding: '1rem', 
-          borderRadius: '4px',
-          marginBottom: '1rem' 
-        }}>
-          {error}
-        </div>
-      )}
+      {/* Historial */}
+      <Card title={`Historial - ${cursoActual?.label || 'Curso'}`}>
+        {filas.length > 0 ? (
+          <Tabla columns={columnas} rows={filas} />
+        ) : (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            <p>No hay observaciones para este curso</p>
+          </div>
+        )}
+      </Card>
 
-      {loading ? (
-        <p>Cargando anotaciones...</p>
-      ) : (
-        <>
-          {filas.length === 0 ? (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '2rem',
-              backgroundColor: '#f5f5f5',
-              borderRadius: '4px'
-            }}>
-              <p>No hay observaciones registradas para este curso</p>
-            </div>
-          ) : (
-            <>
-              <p style={{ marginBottom: '1rem' }}>
-                Se encontraron <strong>{filas.length}</strong> observaciones
-              </p>
-              <Tabla columns={columnas} rows={filas} />
-            </>
-          )}
-        </>
-      )}
-
-      <div style={{ marginTop: '1rem', borderTop: '1px solid #eee', paddingTop: '1rem' }}>
-        <h3>Agregar anotación</h3>
-        <div style={{ display: 'grid', gap: '.5rem', maxWidth: 640 }}>
-          <SelectSimple
-            value={form.estudianteId}
-            onChange={(v) => setForm({ ...form, estudianteId: v })}
-            options={estOptions}
-            etiqueta="Estudiante"
-          />
+      {/* Formulario SÚPER SIMPLE */}
+      <Card title="Agregar Nueva Observación">
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          
+          {/* Estudiante */}
           <div>
-            <label style={{ marginRight: '.5rem' }}>Fecha</label>
-            <input
-              type="date"
-              value={form.fecha}
-              onChange={(e) => setForm({ ...form, fecha: e.target.value })}
-              style={{ 
-                padding: '0.5rem',
-                border: '1px solid #ddd',
-                borderRadius: '4px'
+            <label><strong>Estudiante:</strong></label>
+            <select
+              value={form.estudianteId}
+              onChange={(e) => {
+                console.log('👤 Estudiante cambiado a:', e.target.value);
+                setForm({ ...form, estudianteId: e.target.value });
+              }}
+              style={{
+                padding: '0.75rem',
+                border: '2px solid #ccc',
+                borderRadius: '4px',
+                width: '100%',
+                fontSize: '1rem'
+              }}
+            >
+              <option value="">-- Selecciona un estudiante --</option>
+              {estOptions.map(est => (
+                <option key={est.value} value={est.value}>
+                  {est.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tipo */}
+          <div>
+            <label><strong>Tipo:</strong></label>
+            <select
+              value={form.tipo}
+              onChange={(e) => {
+                console.log('📋 Tipo cambiado a:', e.target.value);
+                setForm({ ...form, tipo: e.target.value });
+              }}
+              style={{
+                padding: '0.75rem',
+                border: '2px solid #ccc',
+                borderRadius: '4px',
+                width: '100%',
+                fontSize: '1rem'
+              }}
+            >
+              {TIPOS_OBSERVACION.map(tipo => (
+                <option key={tipo.value} value={tipo.value}>
+                  {tipo.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Detalle */}
+          <div>
+            <label><strong>Detalle:</strong></label>
+            <textarea
+              rows={4}
+              placeholder="Escribe aquí la observación..."
+              value={form.detalle}
+              onChange={(e) => {
+                console.log('📝 Detalle cambiado, longitud:', e.target.value.length);
+                setForm({ ...form, detalle: e.target.value });
+              }}
+              style={{
+                padding: '0.75rem',
+                border: '2px solid #ccc',
+                borderRadius: '4px',
+                width: '100%',
+                fontSize: '1rem',
+                fontFamily: 'inherit',
+                resize: 'vertical'
               }}
             />
           </div>
-          <div>
-            <label style={{ marginRight: '.5rem' }}>Tipo</label>
-            <select
-              value={form.tipo}
-              onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-              style={{ 
-                padding: '0.5rem',
-                border: '1px solid #ddd',
-                borderRadius: '4px'
+
+          {/* BOTÓN SUPER VISIBLE */}
+          <div style={{ textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                console.log('🔴🔴🔴 CLICK CAPTURADO!!! 🔴🔴🔴');
+                console.log('Event object:', e);
+                e.preventDefault();
+                e.stopPropagation();
+                agregar();
+              }}
+              disabled={!botonHabilitado}
+              style={{
+                padding: '1rem 3rem',
+                backgroundColor: botonHabilitado ? '#007bff' : '#cccccc',
+                color: 'white',
+                border: '3px solid ' + (botonHabilitado ? '#0056b3' : '#999'),
+                borderRadius: '8px',
+                fontSize: '1.2rem',
+                fontWeight: 'bold',
+                cursor: botonHabilitado ? 'pointer' : 'not-allowed',
+                minWidth: '200px',
+                textTransform: 'uppercase'
               }}
             >
-              <option>Positivo</option>
-              <option>Llamado</option>
-              <option>Seguimiento</option>
-            </select>
+              {guardando ? '⏳ Guardando...' : '📝 AGREGAR OBSERVACIÓN'}
+            </button>
+            
+            {/* Estado del botón */}
+            <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+              Estado: <strong>{botonHabilitado ? '🟢 HABILITADO' : '🔴 DESHABILITADO'}</strong>
+              <br />
+              {!botonHabilitado && (
+                <span style={{ color: '#dc3545' }}>
+                  Falta: {!form.estudianteId ? 'Estudiante ' : ''}{!form.detalle.trim() ? 'Detalle' : ''}
+                </span>
+              )}
+            </div>
           </div>
-          <textarea
-            rows={3}
-            placeholder="Detalle de la observación..."
-            value={form.detalle}
-            onChange={(e) => setForm({ ...form, detalle: e.target.value })}
-            style={{ 
-              padding: '0.5rem',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              resize: 'vertical'
-            }}
-          />
-          <button
-            onClick={agregar}
-            disabled={!cursoId || !form.estudianteId || !form.detalle.trim()}
-            style={{
-              padding: '.75rem 1.5rem',
-              width: 'fit-content',
-              backgroundColor: (!cursoId || !form.estudianteId || !form.detalle.trim()) 
-                ? '#ccc' 
-                : '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: (!cursoId || !form.estudianteId || !form.detalle.trim()) 
-                ? 'not-allowed' 
-                : 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
-          >
-            Agregar Observación
-          </button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

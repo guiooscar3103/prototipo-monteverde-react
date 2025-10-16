@@ -2,6 +2,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
+import Asistencia from './pages/docente/Asistencia';
+import ObservadorAlumno from './pages/docente/ObservadorAlumno';
 
 // Layouts
 import DocenteLayout from './layouts/DocenteLayout';
@@ -66,8 +68,8 @@ function App() {
         {/* Rutas anidadas dentro del layout */}
         <Route index element={<DocenteHome />} />
         <Route path="calificaciones" element={<RegistroCalificaciones />} /> {/* ✅ Actualizado */}
-        <Route path="asistencia" element={<div>Asistencia (Por crear)</div>} />
-        <Route path="observador" element={<div>Observador (Por crear)</div>} />
+        <Route path="asistencia" element={<Asistencia />} />
+        <Route path="observador" element={<ObservadorAlumno />} />
         <Route path="mensajes" element={<div>Mensajes (Por crear)</div>} />
       </Route>
       

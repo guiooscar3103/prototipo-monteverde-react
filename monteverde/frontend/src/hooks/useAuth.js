@@ -7,9 +7,9 @@ export const useAuth = () => {
     throw new Error('useAuth debe ser usado dentro de AuthProvider');
   }
   
-  // Mantener compatibilidad con tu código existente
+  
   return {
-    usuario: context.user, // ← Mapear 'user' a 'usuario'
+    usuario: context.user, 
     isAuthenticated: context.isAuthenticated,
     isLoading: context.isLoading,
     error: context.error,
@@ -19,5 +19,5 @@ export const useAuth = () => {
   };
 };
 
-// ✅ También exportar como default para compatibilidad
+
 export default useAuth;

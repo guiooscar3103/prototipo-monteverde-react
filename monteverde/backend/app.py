@@ -263,7 +263,7 @@ def get_docente_dashboard(docente_id):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # =====================================================
-# NUEVOS ENDPOINTS: MENSAJES Y ESTUDIANTES
+# ENDPOINTS: MENSAJES Y ESTUDIANTES
 # =====================================================
 
 @app.route('/api/mensajes/<int:usuario_id>', methods=['GET'])
@@ -345,7 +345,7 @@ def get_estudiantes():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # =====================================================
-# NUEVOS ENDPOINTS: CALIFICACIONES
+# ENDPOINTS: CALIFICACIONES
 # =====================================================
 
 @app.route('/api/estudiantes/por-curso/<int:curso_id>', methods=['GET'])
@@ -480,6 +480,239 @@ def guardar_calificaciones():
     except Exception as e:
         print(f"❌ Error guardar calificaciones: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
+    
+# =====================================================
+# ENDPOINTS: ASISTENCIA
+# =====================================================
+
+@app.route('/api/asistencia/por-fecha', methods=['GET'])
+def get_asistencia_por_fecha():
+    """Obtener asistencia por curso y fecha"""
+    try:
+        curso_id = request.args.get('cursoId')
+        fecha = request.args.get('fecha')
+        
+        print(f"🔍 Buscando asistencia: curso={curso_id}, fecha={fecha}")
+
+        if not curso_id or not fecha:
+            return jsonify({'success': False, 'message': 'cursoId y fecha son requeridos'}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT 
+                a.id,
+                a.estudiante_id,
+                a.fecha,
+                a.estado,
+                e.nombre AS estudiante_nombre
+            FROM asistencia a
+            JOIN estudiantes e ON a.estudiante_id = e.id
+            WHERE e.curso_id = %s AND a.fecha = %s
+            ORDER BY e.nombre
+        """, (curso_id, fecha))
+        
+        asistencia = cursor.fetchall()
+        
+        # Convertir a formato esperado por el frontend
+        resultado = []
+        for a in asistencia:
+            resultado.append({
+                'id': a['id'],
+                'estudianteId': a['estudiante_id'],
+                'fecha': a['fecha'].isoformat() if a['fecha'] else None,
+                'estado': a['estado'],
+                'estudiante_nombre': a['estudiante_nombre']
+            })
+        
+        print(f"📊 Registros de asistencia encontrados: {len(resultado)}")
+        conn.close()
+
+        return jsonify({'success': True, 'data': resultado})
+
+    except Exception as e:
+        print(f"❌ Error asistencia por fecha: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/asistencia/guardar', methods=['POST'])
+def guardar_asistencia():
+    """Guardar o actualizar registros de asistencia"""
+    try:
+        data = request.get_json()
+        marcas = data.get('marcas', [])
+        
+        if not marcas:
+            return jsonify({'success': False, 'message': 'No hay registros de asistencia para guardar'}), 400
+        
+        print(f"💾 Guardando {len(marcas)} registros de asistencia")
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor()
+        
+        for marca in marcas:
+            estudiante_id = marca.get('estudianteId')
+            fecha = marca.get('fecha')
+            estado = marca.get('estado')
+            
+            if not all([estudiante_id, fecha, estado]):
+                continue
+            
+            # Verificar si ya existe un registro
+            cursor.execute("""
+                SELECT id FROM asistencia 
+                WHERE estudiante_id = %s AND fecha = %s
+            """, (estudiante_id, fecha))
+            
+            existing = cursor.fetchone()
+            
+            if existing:
+                # Actualizar registro existente
+                cursor.execute("""
+                    UPDATE asistencia 
+                    SET estado = %s
+                    WHERE estudiante_id = %s AND fecha = %s
+                """, (estado, estudiante_id, fecha))
+                print(f"📝 Actualizada asistencia para estudiante {estudiante_id}")
+            else:
+                # Insertar nuevo registro
+                cursor.execute("""
+                    INSERT INTO asistencia (estudiante_id, fecha, estado)
+                    VALUES (%s, %s, %s)
+                """, (estudiante_id, fecha, estado))
+                print(f"✅ Nueva asistencia para estudiante {estudiante_id}")
+        
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'message': f'Se guardaron {len(marcas)} registros de asistencia correctamente'
+        })
+
+    except Exception as e:
+        print(f"❌ Error guardar asistencia: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/asistencia/estadisticas', methods=['GET'])
+def get_estadisticas_asistencia():
+    """Obtener estadísticas de asistencia por curso y fecha"""
+    try:
+        curso_id = request.args.get('cursoId')
+        fecha = request.args.get('fecha')
+        
+        if not curso_id or not fecha:
+            return jsonify({'success': False, 'message': 'cursoId y fecha son requeridos'}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        
+        # Total de estudiantes en el curso
+        cursor.execute("SELECT COUNT(*) as total FROM estudiantes WHERE curso_id = %s", (curso_id,))
+        total_estudiantes = cursor.fetchone()['total']
+        
+        # Estadísticas por estado
+        cursor.execute("""
+            SELECT 
+                a.estado,
+                COUNT(*) as cantidad
+            FROM asistencia a
+            JOIN estudiantes e ON a.estudiante_id = e.id
+            WHERE e.curso_id = %s AND a.fecha = %s
+            GROUP BY a.estado
+        """, (curso_id, fecha))
+        
+        estadisticas_estado = cursor.fetchall()
+        
+        conn.close()
+        
+        # Crear resumen
+        stats = {
+            'total_estudiantes': total_estudiantes,
+            'por_estado': {stat['estado']: stat['cantidad'] for stat in estadisticas_estado},
+            'registrados': sum(stat['cantidad'] for stat in estadisticas_estado),
+            'pendientes': total_estudiantes - sum(stat['cantidad'] for stat in estadisticas_estado)
+        }
+
+        return jsonify({'success': True, 'data': stats})
+
+    except Exception as e:
+        print(f"❌ Error estadísticas asistencia: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# =====================================================
+# endpoints observaciones
+# =====================================================
+
+@app.route('/api/observaciones/por-curso/<int:curso_id>', methods=['GET'])
+def get_observaciones_por_curso(curso_id):
+    """Obtener observaciones de un curso específico"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        
+        # ✅ Query CORREGIDA sin DATE_FORMAT problemático
+        cursor.execute("""
+            SELECT 
+                o.id,
+                o.estudiante_id,
+                o.docente_id,
+                o.fecha,
+                o.tipo,
+                o.detalle,
+                e.nombre as estudiante_nombre,
+                u.nombre as docente_nombre
+            FROM observaciones o
+            JOIN estudiantes e ON o.estudiante_id = e.id
+            LEFT JOIN usuarios u ON o.docente_id = u.id
+            WHERE e.curso_id = %s
+            ORDER BY o.fecha DESC, o.id DESC
+        """, (curso_id,))
+        
+        observaciones = cursor.fetchall()
+        
+        # ✅ Formatear fechas correctamente
+        resultado = []
+        for obs in observaciones:
+            # Convertir fecha a string legible
+            fecha_str = obs['fecha']
+            if hasattr(obs['fecha'], 'strftime'):
+                fecha_str = obs['fecha'].strftime('%Y-%m-%d')
+            elif hasattr(obs['fecha'], 'isoformat'):
+                fecha_str = obs['fecha'].isoformat()
+            
+            resultado.append({
+                'id': obs['id'],
+                'estudianteId': obs['estudiante_id'],
+                'docenteId': obs['docente_id'],
+                'fecha': fecha_str,
+                'tipo': obs['tipo'],
+                'detalle': obs['detalle'],
+                'estudiante_nombre': obs['estudiante_nombre'],
+                'docente_nombre': obs['docente_nombre']
+            })
+        
+        print(f"📊 Observaciones encontradas para curso {curso_id}: {len(resultado)}")
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True, 'data': resultado})
+
+    except Exception as e:
+        print(f"❌ Error observaciones por curso: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # =====================================================
 # MAIN

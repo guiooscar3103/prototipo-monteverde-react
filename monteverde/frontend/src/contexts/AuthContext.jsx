@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'; // ← AGREGAR useEffect
+import { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext();
 
@@ -11,40 +11,28 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // ✅ Verificar token al cargar (evita pérdida de sesión)
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      
-      if (token) {
-        try {
-          // Verificar si el token es válido
-          const response = await fetch('http://localhost:5000/health');
-          if (response.ok) {
-            // Decodificar el token para obtener datos del usuario
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            setUser({
-              id: payload.user_id,
-              email: payload.email,
-              rol: payload.rol,
-              nombre: payload.nombre || payload.email.split('@')[0]
-            });
-          }
-        } catch (error) {
-          console.error('Token inválido:', error);
-          localStorage.removeItem('token');
-        }
+  const [user, setUser] = useState(() => {
+    // Intentar recuperar usuario del token al inicializar
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return {
+          id: payload.user_id,
+          email: payload.email,
+          rol: payload.rol,
+          nombre: payload.nombre || payload.email.split('@')[0]
+        };
+      } catch (e) {
+        localStorage.removeItem('token');
+        return null;
       }
-      
-      setIsLoading(false);
-    };
+    }
+    return null;
+  });
 
-    checkAuth();
-  }, []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const login = async ({ email, password }) => {
     setError(null);
@@ -53,9 +41,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
@@ -69,7 +55,6 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('Login error:', error);
       setError(error.message);
       throw error;
     } finally {
@@ -82,8 +67,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
   };
 
-  const clearError = () => setError(null);
-
   const value = {
     user,
     isAuthenticated: !!user,
@@ -91,7 +74,7 @@ export const AuthProvider = ({ children }) => {
     error,
     login,
     logout,
-    clearError,
+    clearError: () => setError(null)
   };
 
   return (

@@ -31,7 +31,10 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 };
 
-// Funciones existentes
+// =====================================================
+// FUNCIONES BÁSICAS
+// =====================================================
+
 export const getCursos = async () => {
   return await apiRequest('/cursos');
 };
@@ -49,31 +52,17 @@ export const getEstudiantes = async (cursoId = null) => {
   return await apiRequest(endpoint);
 };
 
+export const getEstudiantesPorCurso = async (cursoId) => {
+  return await apiRequest(`/estudiantes/por-curso/${cursoId}`);
+};
+
+// =====================================================
+// FUNCIONES PARA CALIFICACIONES
+// =====================================================
+
 export const getCalificaciones = async (estudianteId = null) => {
   const endpoint = estudianteId ? `/calificaciones?estudiante_id=${estudianteId}` : '/calificaciones';
   return await apiRequest(endpoint);
-};
-
-export const getAsistencia = async (fecha = null, cursoId = null) => {
-  let endpoint = '/asistencia';
-  const params = [];
-  
-  if (fecha) params.push(`fecha=${fecha}`);
-  if (cursoId) params.push(`curso_id=${cursoId}`);
-  
-  if (params.length > 0) {
-    endpoint += '?' + params.join('&');
-  }
-  
-  return await apiRequest(endpoint);
-};
-
-// =====================================================
-// NUEVAS FUNCIONES PARA CALIFICACIONES
-// =====================================================
-
-export const getEstudiantesPorCurso = async (cursoId) => {
-  return await apiRequest(`/estudiantes/por-curso/${cursoId}`);
 };
 
 export const getCalificacionesPor = async ({ cursoId, asignatura, periodo }) => {
@@ -91,4 +80,69 @@ export const guardarCalificaciones = async (calificaciones) => {
     method: 'POST',
     body: JSON.stringify({ calificaciones }),
   });
+};
+
+// =====================================================
+// FUNCIONES PARA ASISTENCIA
+// =====================================================
+
+export const getAsistencia = async (fecha = null, cursoId = null) => {
+  let endpoint = '/asistencia';
+  const params = [];
+  
+  if (fecha) params.push(`fecha=${fecha}`);
+  if (cursoId) params.push(`curso_id=${cursoId}`);
+  
+  if (params.length > 0) {
+    endpoint += '?' + params.join('&');
+  }
+  
+  return await apiRequest(endpoint);
+};
+
+export const getAsistenciaPorFecha = async ({ cursoId, fecha }) => {
+  const params = new URLSearchParams();
+  
+  if (cursoId) params.append('cursoId', cursoId);
+  if (fecha) params.append('fecha', fecha);
+  
+  return await apiRequest(`/asistencia/por-fecha?${params.toString()}`);
+};
+
+export const guardarAsistencia = async (marcas) => {
+  return await apiRequest('/asistencia/guardar', {
+    method: 'POST',
+    body: JSON.stringify({ marcas }),
+  });
+};
+
+export const getEstadisticasAsistencia = async ({ cursoId, fecha }) => {
+  const params = new URLSearchParams();
+  
+  if (cursoId) params.append('cursoId', cursoId);
+  if (fecha) params.append('fecha', fecha);
+  
+  return await apiRequest(`/asistencia/estadisticas?${params.toString()}`);
+};
+
+// =====================================================
+// FUNCIONES PARA OBSERVACIONES
+// =====================================================
+
+export const getObservadorPorCurso = async (cursoId) => {
+  console.log('🌐 API: Obteniendo observaciones para curso:', cursoId);
+  return await apiRequest(`/observaciones/por-curso/${cursoId}`);
+};
+
+export const agregarAnotacion = async (observacion) => {
+  console.log('🌐 API: Enviando observación:', observacion);
+  return await apiRequest('/observaciones/agregar', {
+    method: 'POST',
+    body: JSON.stringify(observacion),
+  });
+};
+
+export const getEstadisticasObservaciones = async (cursoId) => {
+  console.log('🌐 API: Obteniendo estadísticas para curso:', cursoId);
+  return await apiRequest(`/observaciones/estadisticas/${cursoId}`);
 };
