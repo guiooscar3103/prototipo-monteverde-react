@@ -22,42 +22,31 @@ export default function MensajesDocente() {
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [mensaje, setMensaje] = useState('');
+  const [filtro, setFiltro] = useState('');
 
   // Cargar conversaciones y familias
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        console.log('📧 Cargando mensajes para usuario:', usuario?.id);
-        
         const [mensajes, usuariosFamilia] = await Promise.all([
           getMensajesPorUsuario(usuario.id),
           getUsuariosPorRol('familia')
         ]);
-
-        console.log('📧 Mensajes obtenidos:', mensajes);
-        console.log('👨‍👩‍👧‍👦 Familias obtenidas:', usuariosFamilia);
-
         setFamilias(usuariosFamilia);
         await procesarConversaciones(mensajes);
       } catch (error) {
-        console.error('❌ Error al cargar datos:', error);
         setMensaje('❌ Error al cargar mensajes: ' + error.message);
       } finally {
         setLoading(false);
       }
     };
-
-    if (usuario) {
-      cargarDatos();
-    }
+    if (usuario) cargarDatos();
   }, [usuario]);
 
   const procesarConversaciones = async (mensajes) => {
     const conversacionesMap = {};
-    
     for (const mensaje of mensajes) {
       const contactoId = mensaje.emisorId == usuario.id ? mensaje.receptorId : mensaje.emisorId;
-      
       if (!conversacionesMap[contactoId]) {
         try {
           const contacto = await getUsuarioPorId(contactoId);
@@ -66,70 +55,69 @@ export default function MensajesDocente() {
             ultimoMensaje: mensaje,
             noLeidos: 0
           };
-        } catch (error) {
-          console.error('❌ Error al obtener contacto:', error);
+        } catch {
           continue;
         }
       }
-      
-      // Contar mensajes no leídos recibidos
       if (mensaje.receptorId == usuario.id && !mensaje.leido) {
         conversacionesMap[contactoId].noLeidos++;
       }
-      
-      // Mantener el mensaje más reciente
       if (!conversacionesMap[contactoId].ultimoMensaje || 
           new Date(mensaje.fecha) > new Date(conversacionesMap[contactoId].ultimoMensaje.fecha)) {
         conversacionesMap[contactoId].ultimoMensaje = mensaje;
       }
     }
-    
     setConversaciones(Object.values(conversacionesMap).sort((a, b) => 
       new Date(b.ultimoMensaje.fecha) - new Date(a.ultimoMensaje.fecha)
     ));
   };
 
+  // Filtro de contactos por nombre/asunto/cuerpo
+  const filtrarContactos = (lista) => {
+    if (!filtro.trim()) return lista;
+    const filtroLower = filtro.trim().toLowerCase();
+    return lista.filter(familia => {
+      // Buscar por nombre y email
+      if (
+        (familia.nombre && familia.nombre.toLowerCase().includes(filtroLower)) ||
+        (familia.email && familia.email.toLowerCase().includes(filtroLower))
+      ) return true;
+      // Buscar por mensaje más reciente
+      const conv = conversaciones.find(c => c.contacto.id === familia.id);
+      if (conv && (
+        (conv.ultimoMensaje?.asunto && conv.ultimoMensaje.asunto.toLowerCase().includes(filtroLower)) ||
+        (conv.ultimoMensaje?.cuerpo && conv.ultimoMensaje.cuerpo.toLowerCase().includes(filtroLower))
+      )) return true;
+      return false;
+    });
+  };
+
   const abrirConversacion = async (contacto) => {
     setContactoSeleccionado(contacto);
     setAsunto('');
-    
     try {
-      console.log('💬 Abriendo conversación con:', contacto.nombre);
-      
       const mensajes = await getConversacion(usuario.id, contacto.id);
-      console.log('💬 Mensajes de conversación:', mensajes);
-      
       setConversacionActual(mensajes);
-      
-      // Marcar como leídos los mensajes recibidos
-      const mensajesNoLeidos = mensajes.filter(m => 
-        m.receptorId == usuario.id && !m.leido
-      );
-      
+      // Marcar como leídos
+      const mensajesNoLeidos = mensajes.filter(m => m.receptorId == usuario.id && !m.leido);
       for (const mensajeNoLeido of mensajesNoLeidos) {
         await marcarComoLeido(mensajeNoLeido.id);
       }
-      
-      // Actualizar contador de no leídos
       setConversaciones(prev => prev.map(conv => 
         conv.contacto.id === contacto.id 
           ? { ...conv, noLeidos: 0 }
           : conv
       ));
     } catch (error) {
-      console.error('❌ Error al cargar conversación:', error);
       setMensaje('❌ Error al cargar conversación: ' + error.message);
     }
   };
 
   const enviarNuevoMensaje = async (e) => {
     e.preventDefault();
-    
     if (!nuevoMensaje.trim() || !contactoSeleccionado) return;
-    
     setEnviando(true);
     setMensaje('');
-    
     try {
       const mensajeData = {
         emisorId: usuario.id,
@@ -137,30 +125,15 @@ export default function MensajesDocente() {
         asunto: asunto || 'Mensaje del docente',
         cuerpo: nuevoMensaje.trim()
       };
-      
-      console.log('📤 Enviando mensaje:', mensajeData);
-      
       const mensajeEnviado = await enviarMensaje(mensajeData);
-      console.log('✅ Mensaje enviado:', mensajeEnviado);
-      
-      // Actualizar conversación actual
       setConversacionActual(prev => [...prev, mensajeEnviado]);
-      
-      // Limpiar formulario
       setNuevoMensaje('');
       setAsunto('');
-      
-      // Actualizar lista de conversaciones
       const mensajesActualizados = await getMensajesPorUsuario(usuario.id);
       await procesarConversaciones(mensajesActualizados);
-      
       setMensaje('✅ Mensaje enviado correctamente');
-      
-      // Limpiar mensaje de éxito después de 3 segundos
       setTimeout(() => setMensaje(''), 3000);
-      
     } catch (error) {
-      console.error('❌ Error al enviar mensaje:', error);
       setMensaje('❌ Error al enviar mensaje: ' + error.message);
     } finally {
       setEnviando(false);
@@ -181,7 +154,8 @@ export default function MensajesDocente() {
     );
   }
 
-  const totalNoLeidos = conversaciones.reduce((sum, conv) => sum + conv.noLeidos, 0);
+  // Contactos filtrados
+  const familiasFiltradas = filtrarContactos(familias);
 
   return (
     <div className="grid">
@@ -191,11 +165,6 @@ export default function MensajesDocente() {
         derecha={
           <div style={{ fontSize: '0.9rem', textAlign: 'right', color: '#666' }}>
             <div><strong>{conversaciones.length}</strong> conversaciones</div>
-            {totalNoLeidos > 0 && (
-              <div style={{ color: '#dc3545' }}>
-                <strong>{totalNoLeidos}</strong> no leídos
-              </div>
-            )}
           </div>
         }
       />
@@ -222,117 +191,51 @@ export default function MensajesDocente() {
         gap: '1rem', 
         height: '70vh'
       }}>
-        {/* Lista de conversaciones */}
+        {/* Lista de contactos con filtro */}
         <Card title="Contactos" style={{ padding: '1rem', overflowY: 'auto', height: '100%' }}>
-          {/* Familias disponibles */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h4 style={{ 
-              fontSize: '0.9rem', 
-              color: '#666', 
-              marginBottom: '0.75rem',
-              textTransform: 'uppercase',
-              fontWeight: 'bold'
-            }}>
-              💬 Nuevas conversaciones ({familias.length})
-            </h4>
-            <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-              {familias.map(familia => (
-                <div
-                  key={`nuevo-${familia.id}`}
-                  onClick={() => abrirConversacion(familia)}
-                  style={{
-                    padding: '0.75rem',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    marginBottom: '0.5rem',
-                    backgroundColor: contactoSeleccionado?.id === familia.id ? '#e3f2fd' : '#f9f9f9',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
-                    👨‍👩‍👧‍👦 {familia.nombre}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
-                    {familia.email}
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="text"
+              value={filtro}
+              onChange={e => setFiltro(e.target.value)}
+              placeholder="🔍 Buscar familia, asunto o mensaje"
+              style={{
+                width: '100%',
+                background: "#f4f4f4",
+                border: '1px solid #ddd',
+                borderRadius: '6px',
+                padding: '0.5rem 0.85rem',
+                fontSize: '0.97rem'
+              }}
+            />
           </div>
-          
-          {/* Conversaciones activas */}
-          {conversaciones.length > 0 && (
-            <div>
-              <h4 style={{ 
-                fontSize: '0.9rem', 
-                color: '#666', 
-                marginBottom: '0.75rem',
-                textTransform: 'uppercase',
-                fontWeight: 'bold'
-              }}>
-                💭 Conversaciones activas ({conversaciones.length})
-              </h4>
-              {conversaciones.map(conv => (
-                <div
-                  key={conv.contacto.id}
-                  onClick={() => abrirConversacion(conv.contacto)}
-                  style={{
-                    padding: '0.75rem',
-                    border: '2px solid',
-                    borderColor: contactoSeleccionado?.id === conv.contacto.id ? '#2196f3' : '#ddd',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    marginBottom: '0.5rem',
-                    backgroundColor: contactoSeleccionado?.id === conv.contacto.id ? '#e3f2fd' : 'white',
-                    position: 'relative',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginBottom: '0.25rem'
-                  }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
-                      👨‍👩‍👧‍👦 {conv.contacto.nombre}
-                    </div>
-                    {conv.noLeidos > 0 && (
-                      <span style={{
-                        backgroundColor: '#f44336',
-                        color: 'white',
-                        borderRadius: '50%',
-                        padding: '2px 8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold',
-                        minWidth: '20px',
-                        textAlign: 'center'
-                      }}>
-                        {conv.noLeidos}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>
-                    📧 {conv.ultimoMensaje.asunto}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>
-                    {conv.ultimoMensaje.cuerpo.substring(0, 60)}
-                    {conv.ultimoMensaje.cuerpo.length > 60 ? '...' : ''}
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: '#999' }}>
-                    🕐 {new Date(conv.ultimoMensaje.fecha).toLocaleDateString('es-ES', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </div>
+          <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+            {familiasFiltradas.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#999', padding: '1rem' }}>No hay coincidencias.</div>
+            )}
+            {familiasFiltradas.map(familia => (
+              <div
+                key={`nuevo-${familia.id}`}
+                onClick={() => abrirConversacion(familia)}
+                style={{
+                  padding: '0.75rem',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  marginBottom: '0.5rem',
+                  backgroundColor: contactoSeleccionado?.id === familia.id ? '#e3f2fd' : '#f9f9f9',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
+                  👨‍👩‍👧‍👦 {familia.nombre}
                 </div>
-              ))}
-            </div>
-          )}
+                <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
+                  {familia.email}
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
         
         {/* Área de conversación */}
@@ -410,7 +313,7 @@ export default function MensajesDocente() {
                           opacity: 0.7,
                           textAlign: 'right'
                         }}>
-                          🕐 {new Date(mensajeItem.fecha).toLocaleDateString('es-ES', {
+                          🕐 {new Date(mensajeItem.fecha).toLocaleString('es-ES', {
                             day: '2-digit',
                             month: '2-digit',
                             hour: '2-digit',

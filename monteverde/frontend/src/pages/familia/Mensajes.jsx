@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import BarraTitulo from '../../components/BarraTitulo';
 import Card from '../../components/Card';
-import { 
-  getMensajesPorUsuario, 
-  getConversacion, 
-  enviarMensaje, 
+import {
+  getMensajesPorUsuario,
+  getConversacion,
+  enviarMensaje,
   marcarComoLeido,
   getUsuariosPorRol,
-  getUsuarioPorId 
+  getUsuarioPorId
 } from '../../services/api';
 
 export default function FamiliaMensajes() {
@@ -22,50 +22,34 @@ export default function FamiliaMensajes() {
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [mensaje, setMensaje] = useState('');
+  const [filtro, setFiltro] = useState('');
 
-  // Cargar conversaciones y docentes
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        console.log('📧 Familia: Cargando mensajes para usuario:', usuario?.id);
-        
         const [mensajes, usuariosDocente] = await Promise.all([
           getMensajesPorUsuario(usuario.id),
-          getUsuariosPorRol('docente').catch(err => {
-            console.warn('No se pudieron cargar docentes:', err);
-            return [];
-          })
+          getUsuariosPorRol('docente').catch(() => [])
         ]);
-
-        console.log('📧 Mensajes obtenidos:', mensajes);
-        console.log('👨‍🏫 Docentes obtenidos:', usuariosDocente);
-
         setDocentes(usuariosDocente || []);
         await procesarConversaciones(mensajes || []);
-        
       } catch (error) {
-        console.error('❌ Error al cargar datos:', error);
         setMensaje('❌ Error al cargar mensajes: ' + error.message);
       } finally {
         setLoading(false);
       }
     };
 
-    if (usuario?.id) {
-      cargarDatos();
-    }
+    if (usuario?.id) cargarDatos();
   }, [usuario]);
 
   const procesarConversaciones = async (mensajes) => {
     const conversacionesMap = {};
-    
     for (const mensajeItem of mensajes) {
       const contactoId = mensajeItem.emisor_id == usuario.id ? mensajeItem.receptor_id : mensajeItem.emisor_id;
-      
       if (!conversacionesMap[contactoId]) {
         try {
           const contacto = await getUsuarioPorId(contactoId);
-          // Solo mostrar conversaciones con docentes
           if (contacto.rol === 'docente') {
             conversacionesMap[contactoId] = {
               contacto,
@@ -73,84 +57,75 @@ export default function FamiliaMensajes() {
               noLeidos: 0
             };
           }
-        } catch (error) {
-          console.error('❌ Error al obtener contacto:', contactoId, error);
+        } catch {
           continue;
         }
       }
-      
-      // Contar mensajes no leídos recibidos
       if (mensajeItem.receptor_id == usuario.id && !mensajeItem.leido && conversacionesMap[contactoId]) {
         conversacionesMap[contactoId].noLeidos++;
       }
-      
-      // Mantener el mensaje más reciente
       if (conversacionesMap[contactoId]) {
         const fechaActual = new Date(mensajeItem.fecha);
         const fechaUltimo = new Date(conversacionesMap[contactoId].ultimoMensaje.fecha);
-        
         if (fechaActual > fechaUltimo) {
           conversacionesMap[contactoId].ultimoMensaje = mensajeItem;
         }
       }
     }
-    
-    const conversacionesArray = Object.values(conversacionesMap).sort((a, b) => 
+    const conversacionesArray = Object.values(conversacionesMap).sort((a, b) =>
       new Date(b.ultimoMensaje.fecha) - new Date(a.ultimoMensaje.fecha)
     );
-    
     setConversaciones(conversacionesArray);
+  };
+
+  // Filtro por nombre/asunto/mensaje
+  const filtrarDocentes = (lista) => {
+    if (!filtro.trim()) return lista;
+    const filtroLower = filtro.trim().toLowerCase();
+    return lista.filter(docente => {
+      if (
+        (docente.nombre && docente.nombre.toLowerCase().includes(filtroLower)) ||
+        (docente.email && docente.email.toLowerCase().includes(filtroLower))
+      ) return true;
+      const conv = conversaciones.find(c => c.contacto.id === docente.id);
+      if (conv && (
+        (conv.ultimoMensaje?.asunto && conv.ultimoMensaje.asunto.toLowerCase().includes(filtroLower)) ||
+        (conv.ultimoMensaje?.cuerpo && conv.ultimoMensaje.cuerpo.toLowerCase().includes(filtroLower))
+      )) return true;
+      return false;
+    });
   };
 
   const abrirConversacion = async (contacto) => {
     setContactoSeleccionado(contacto);
     setAsunto('');
-    
     try {
-      console.log('💬 Familia: Abriendo conversación con:', contacto.nombre);
-      
       const mensajes = await getConversacion(usuario.id, contacto.id);
-      console.log('💬 Mensajes de conversación:', mensajes);
-      
       setConversacionActual(mensajes || []);
-      
-      // Marcar como leídos los mensajes recibidos
-      const mensajesNoLeidos = (mensajes || []).filter(m => 
+      const mensajesNoLeidos = (mensajes || []).filter(m =>
         m.receptor_id == usuario.id && !m.leido
       );
-      
       for (const mensajeNoLeido of mensajesNoLeidos) {
-        try {
-          await marcarComoLeido(mensajeNoLeido.id);
-        } catch (error) {
-          console.warn('⚠️ No se pudo marcar como leído:', mensajeNoLeido.id);
-        }
+        await marcarComoLeido(mensajeNoLeido.id);
       }
-      
-      // Actualizar contador de no leídos
-      setConversaciones(prev => prev.map(conv => 
-        conv.contacto.id === contacto.id 
+      setConversaciones(prev => prev.map(conv =>
+        conv.contacto.id === contacto.id
           ? { ...conv, noLeidos: 0 }
           : conv
       ));
-      
     } catch (error) {
-      console.error('❌ Error al cargar conversación:', error);
       setMensaje('❌ Error al cargar conversación: ' + error.message);
     }
   };
 
   const enviarNuevoMensaje = async (e) => {
     e.preventDefault();
-    
     if (!nuevoMensaje.trim() || !contactoSeleccionado) {
       setMensaje('⚠️ Escribe un mensaje y selecciona un contacto');
       return;
     }
-    
     setEnviando(true);
     setMensaje('');
-    
     try {
       const mensajeData = {
         emisorId: usuario.id,
@@ -158,34 +133,17 @@ export default function FamiliaMensajes() {
         asunto: asunto.trim() || 'Consulta familiar',
         cuerpo: nuevoMensaje.trim()
       };
-      
-      console.log('📤 Familia: Enviando mensaje:', mensajeData);
-      
       const mensajeEnviado = await enviarMensaje(mensajeData);
-      console.log('✅ Mensaje enviado:', mensajeEnviado);
-      
-      // Actualizar conversación actual
       setConversacionActual(prev => [...prev, mensajeEnviado]);
-      
-      // Limpiar formulario
       setNuevoMensaje('');
       setAsunto('');
-      
-      // Actualizar lista de conversaciones
       try {
         const mensajesActualizados = await getMensajesPorUsuario(usuario.id);
         await procesarConversaciones(mensajesActualizados);
-      } catch (error) {
-        console.warn('⚠️ No se pudo actualizar lista de conversaciones');
-      }
-      
+      } catch {}
       setMensaje('✅ Mensaje enviado correctamente');
-      
-      // Limpiar mensaje después de 3 segundos
       setTimeout(() => setMensaje(''), 3000);
-      
     } catch (error) {
-      console.error('❌ Error al enviar mensaje:', error);
       setMensaje('❌ Error al enviar mensaje: ' + error.message);
     } finally {
       setEnviando(false);
@@ -206,28 +164,22 @@ export default function FamiliaMensajes() {
     );
   }
 
-  const totalNoLeidos = conversaciones.reduce((sum, conv) => sum + conv.noLeidos, 0);
+  const docentesFiltrados = filtrarDocentes(docentes);
 
   return (
     <div className="grid">
-      <BarraTitulo 
-        titulo="Mensajes" 
+      <BarraTitulo
+        titulo="Mensajes"
         subtitulo="Comunicación con docentes"
         derecha={
           <div style={{ fontSize: '0.9rem', textAlign: 'right', color: '#666' }}>
             <div><strong>{conversaciones.length}</strong> conversaciones</div>
-            {totalNoLeidos > 0 && (
-              <div style={{ color: '#dc3545' }}>
-                <strong>{totalNoLeidos}</strong> no leídos
-              </div>
-            )}
           </div>
         }
       />
 
-      {/* Mensajes de estado */}
       {mensaje && (
-        <div style={{ 
+        <div style={{
           padding: '0.75rem 1rem',
           backgroundColor: mensaje.includes('✅') ? '#d4edda' : mensaje.includes('⚠️') ? '#fff3cd' : '#f8d7da',
           color: mensaje.includes('✅') ? '#155724' : mensaje.includes('⚠️') ? '#856404' : '#721c24',
@@ -240,143 +192,66 @@ export default function FamiliaMensajes() {
           {mensaje}
         </div>
       )}
-      
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '350px 1fr', 
-        gap: '1rem', 
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '350px 1fr',
+        gap: '1rem',
         height: '70vh'
       }}>
-        {/* Lista de conversaciones */}
+        {/* Lista de contactos filtrados */}
         <Card title="Contactos" style={{ padding: '1rem', overflowY: 'auto', height: '100%' }}>
-          {/* Docentes disponibles */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h4 style={{ 
-              fontSize: '0.9rem', 
-              color: '#666', 
-              marginBottom: '0.75rem',
-              textTransform: 'uppercase',
-              fontWeight: 'bold'
-            }}>
-              👨‍🏫 Docentes disponibles ({docentes.length})
-            </h4>
-            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-              {docentes.length > 0 ? (
-                docentes.map(docente => (
-                  <div
-                    key={`nuevo-${docente.id}`}
-                    onClick={() => abrirConversacion(docente)}
-                    style={{
-                      padding: '0.75rem',
-                      border: '1px solid #e0e0e0',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      marginBottom: '0.5rem',
-                      backgroundColor: contactoSeleccionado?.id === docente.id ? '#e3f2fd' : '#f9f9f9',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
-                      👨‍🏫 {docente.nombre}
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
-                      📧 {docente.email}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div style={{ 
-                  textAlign: 'center', 
-                  padding: '1rem',
-                  color: '#666',
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: '6px'
-                }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>👨‍🏫</div>
-                  <p style={{ fontSize: '0.9rem', margin: 0 }}>No hay docentes disponibles</p>
-                </div>
-              )}
-            </div>
+          <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="text"
+              value={filtro}
+              onChange={e => setFiltro(e.target.value)}
+              placeholder="🔍 Buscar docente, asunto o mensaje"
+              style={{
+                width: '100%',
+                background: "#f4f4f4",
+                border: '1px solid #ddd',
+                borderRadius: '6px',
+                padding: '0.5rem 0.85rem',
+                fontSize: '0.97rem'
+              }}
+            />
           </div>
-          
-          {/* Conversaciones activas */}
-          {conversaciones.length > 0 && (
-            <div>
-              <h4 style={{ 
-                fontSize: '0.9rem', 
-                color: '#666', 
-                marginBottom: '0.75rem',
-                textTransform: 'uppercase',
-                fontWeight: 'bold'
-              }}>
-                💭 Conversaciones activas ({conversaciones.length})
-              </h4>
-              {conversaciones.map(conv => (
-                <div
-                  key={conv.contacto.id}
-                  onClick={() => abrirConversacion(conv.contacto)}
-                  style={{
-                    padding: '0.75rem',
-                    border: '2px solid',
-                    borderColor: contactoSeleccionado?.id === conv.contacto.id ? '#2196f3' : '#ddd',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    marginBottom: '0.5rem',
-                    backgroundColor: contactoSeleccionado?.id === conv.contacto.id ? '#e3f2fd' : 'white',
-                    position: 'relative',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginBottom: '0.25rem'
-                  }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
-                      👨‍🏫 {conv.contacto.nombre}
-                    </div>
-                    {conv.noLeidos > 0 && (
-                      <span style={{
-                        backgroundColor: '#f44336',
-                        color: 'white',
-                        borderRadius: '50%',
-                        padding: '2px 8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold'
-                      }}>
-                        {conv.noLeidos}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>
-                    📧 {conv.ultimoMensaje.asunto}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>
-                    {conv.ultimoMensaje.cuerpo.substring(0, 50)}
-                    {conv.ultimoMensaje.cuerpo.length > 50 ? '...' : ''}
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: '#999' }}>
-                    🕐 {new Date(conv.ultimoMensaje.fecha).toLocaleDateString('es-ES', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </div>
+          <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+            {docentesFiltrados.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#999', padding: '1rem' }}>No hay coincidencias.</div>
+            )}
+            {docentesFiltrados.map(docente => (
+              <div
+                key={`nuevo-${docente.id}`}
+                onClick={() => abrirConversacion(docente)}
+                style={{
+                  padding: '0.75rem',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  marginBottom: '0.5rem',
+                  backgroundColor: contactoSeleccionado?.id === docente.id ? '#e3f2fd' : '#f9f9f9',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
+                  👨‍🏫 {docente.nombre}
                 </div>
-              ))}
-            </div>
-          )}
+                <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
+                  📧 {docente.email}
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
-        
+
         {/* Área de conversación */}
         <Card style={{ padding: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
           {contactoSeleccionado ? (
             <>
-              {/* Header de la conversación */}
-              <div style={{ 
-                padding: '1rem', 
+              <div style={{
+                padding: '1rem',
                 borderBottom: '2px solid #eee',
                 backgroundColor: '#f8f9fa'
               }}>
@@ -387,18 +262,17 @@ export default function FamiliaMensajes() {
                   📧 {contactoSeleccionado.email} • 👤 {contactoSeleccionado.rol}
                 </p>
               </div>
-              
               {/* Mensajes */}
-              <div style={{ 
-                flex: 1, 
-                padding: '1rem', 
+              <div style={{
+                flex: 1,
+                padding: '1rem',
                 overflowY: 'auto',
                 backgroundColor: '#fafafa'
               }}>
                 {conversacionActual.length === 0 ? (
-                  <div style={{ 
-                    textAlign: 'center', 
-                    color: '#666', 
+                  <div style={{
+                    textAlign: 'center',
+                    color: '#666',
                     padding: '2rem',
                     fontSize: '0.9rem'
                   }}>
@@ -427,23 +301,23 @@ export default function FamiliaMensajes() {
                           border: mensajeItem.emisor_id != usuario.id ? '1px solid #e0e0e0' : 'none'
                         }}
                       >
-                        <div style={{ 
-                          fontWeight: 'bold', 
-                          fontSize: '0.85rem', 
+                        <div style={{
+                          fontWeight: 'bold',
+                          fontSize: '0.85rem',
                           marginBottom: '0.5rem',
                           opacity: 0.9
                         }}>
                           📧 {mensajeItem.asunto}
                         </div>
-                        <div style={{ 
-                          fontSize: '0.95rem', 
+                        <div style={{
+                          fontSize: '0.95rem',
                           lineHeight: '1.4',
                           marginBottom: '0.5rem'
                         }}>
                           {mensajeItem.cuerpo}
                         </div>
-                        <div style={{ 
-                          fontSize: '0.75rem', 
+                        <div style={{
+                          fontSize: '0.75rem',
                           opacity: 0.7,
                           textAlign: 'right'
                         }}>
@@ -459,12 +333,10 @@ export default function FamiliaMensajes() {
                   ))
                 )}
               </div>
-              
-              {/* Formulario de envío */}
-              <form 
+              <form
                 onSubmit={enviarNuevoMensaje}
-                style={{ 
-                  padding: '1rem', 
+                style={{
+                  padding: '1rem',
                   borderTop: '2px solid #eee',
                   backgroundColor: '#ffffff'
                 }}
@@ -527,10 +399,10 @@ export default function FamiliaMensajes() {
               </form>
             </>
           ) : (
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               height: '100%',
               color: '#666',
               textAlign: 'center',

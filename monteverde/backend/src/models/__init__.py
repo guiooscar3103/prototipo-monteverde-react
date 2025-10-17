@@ -1,17 +1,17 @@
-# Solo importar modelos que SÍ existen
-try:
-    from .usuario import Usuario
-except ImportError:
-    pass
+from .usuario import Usuario
+from .estudiante import Estudiante
+from .curso import Curso
+from .asistencia import Asistencia
+from .calificacion import Calificacion
+from .mensaje import Mensaje
+from .observacion import Observacion
 
-try:
-    from .estudiante import Estudiante  
-except ImportError:
-    pass
-
-try:
-    from .curso import Curso
-except ImportError:
-    pass
-
-# Agregar más según tengas los archivos
+__all__ = [
+    'Usuario',
+    'Estudiante', 
+    'Curso',
+    'Asistencia',
+    'Calificacion',
+    'Mensaje',
+    'Observacion'
+]

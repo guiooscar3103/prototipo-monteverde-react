@@ -8,7 +8,8 @@ class Observacion(db.Model):
     estudiante_id = db.Column(db.Integer, db.ForeignKey('estudiantes.id'), nullable=False)
     docente_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
     fecha = db.Column(db.Date, nullable=False)
-    tipo = db.Column(db.String(20), nullable=False)
+    # ✅ VERIFICAR que estos valores coincidan con tu BD:
+    tipo = db.Column(db.Enum('POSITIVA', 'NEGATIVA', 'NEUTRAL'), nullable=False)  # O los valores que tengas
     detalle = db.Column(db.Text, nullable=False)
     
     # Relaciones
