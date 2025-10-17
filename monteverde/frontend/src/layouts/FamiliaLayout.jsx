@@ -1,8 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import HeaderBar from '../components/HeaderBar'
+import { useAuth } from '../hooks/useAuth'
 
 export default function FamiliaLayout() {
+  const { usuario } = useAuth()
   const link = {padding:'.35rem 0', color:'#4c1d95'}
+  
   return (
     <div style={{display:'grid', gridTemplateColumns:'240px 1fr', minHeight:'100vh'}}>
       <aside style={{borderRight:'1px solid #eee', padding:'1rem', background:'#fff'}}>
@@ -18,7 +21,7 @@ export default function FamiliaLayout() {
       </aside>
 
       <main style={{display:'flex', flexDirection:'column'}}>
-        <HeaderBar usuario="Carlos M." rol="Familia" />
+        <HeaderBar usuario={usuario?.nombre || 'Familia'} rol="Familia" />
         <div style={{padding:'1rem 1.5rem'}}><Outlet /></div>
       </main>
     </div>

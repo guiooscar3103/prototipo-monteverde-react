@@ -713,6 +713,421 @@ def get_observaciones_por_curso(curso_id):
         print(f"❌ Error observaciones por curso: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# =====================================================
+# MENSAJES DOCENTE
+# =====================================================
+
+@app.route('/api/usuarios/familia', methods=['GET'])
+def get_familias():
+    """Obtener usuarios familia"""
+    try:
+        print("👨‍👩‍👧‍👦 Solicitando familias...")
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, nombre, email, rol
+            FROM usuarios
+            WHERE rol = 'familia'
+            ORDER BY nombre
+        """)
+        
+        usuarios = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        print(f"✅ Familias encontradas: {len(usuarios)}")
+        return jsonify({'success': True, 'data': usuarios})
+
+    except Exception as e:
+        print(f"❌ Error familias: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/usuario/<int:usuario_id>', methods=['GET'])
+def get_usuario_por_id_simple(usuario_id):
+    """Obtener usuario por ID"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, nombre, email, rol FROM usuarios WHERE id = %s", (usuario_id,))
+        
+        usuario_data = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not usuario_data:
+            return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
+
+        return jsonify({'success': True, 'data': usuario_data})
+
+    except Exception as e:
+        print(f"❌ Error usuario por ID: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/conversacion/<int:usuario1>/<int:usuario2>', methods=['GET'])
+def get_conversacion_entre_usuarios(usuario1, usuario2):
+    """Obtener conversación entre dos usuarios"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT 
+                m.id,
+                m.emisor_id,
+                m.receptor_id,
+                m.asunto,
+                m.cuerpo,
+                m.leido,
+                DATE_FORMAT(m.fecha, '%%Y-%%m-%%d %%H:%%i:%%s') as fecha,
+                emisor.nombre as emisor_nombre,
+                receptor.nombre as receptor_nombre
+            FROM mensajes m
+            JOIN usuarios emisor ON m.emisor_id = emisor.id
+            JOIN usuarios receptor ON m.receptor_id = receptor.id
+            WHERE (m.emisor_id = %s AND m.receptor_id = %s) 
+               OR (m.emisor_id = %s AND m.receptor_id = %s)
+            ORDER BY m.fecha ASC
+        """, (usuario1, usuario2, usuario2, usuario1))
+        
+        mensajes = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True, 'data': mensajes})
+
+    except Exception as e:
+        print(f"❌ Error conversación: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/mensajes/enviar', methods=['POST'])
+def enviar_mensaje_nuevo():
+    """Enviar nuevo mensaje"""
+    try:
+        data = request.get_json()
+        
+        emisor_id = data.get('emisorId')
+        receptor_id = data.get('receptorId')
+        asunto = data.get('asunto', 'Sin asunto')
+        cuerpo = data.get('cuerpo')
+        
+        if not all([emisor_id, receptor_id, cuerpo]):
+            return jsonify({
+                'success': False, 
+                'message': 'Faltan campos: emisorId, receptorId, cuerpo'
+            }), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO mensajes (emisor_id, receptor_id, asunto, cuerpo, fecha, leido)
+            VALUES (%s, %s, %s, %s, NOW(), 0)
+        """, (emisor_id, receptor_id, asunto, cuerpo))
+        
+        conn.commit()
+        mensaje_id = cursor.lastrowid
+        cursor.close()
+        conn.close()
+
+        # Retornar el mensaje recién creado
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT 
+                m.id,
+                m.emisor_id as emisorId,
+                m.receptor_id as receptorId,
+                m.asunto,
+                m.cuerpo,
+                m.leido,
+                DATE_FORMAT(m.fecha, '%%Y-%%m-%%d %%H:%%i:%%s') as fecha
+            FROM mensajes m
+            WHERE m.id = %s
+        """, (mensaje_id,))
+        
+        mensaje_creado = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        print(f"✅ Mensaje creado con ID: {mensaje_id}")
+        return jsonify({'success': True, 'data': mensaje_creado})
+
+    except Exception as e:
+        print(f"❌ Error enviar mensaje: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/mensajes/marcar-leido/<int:mensaje_id>', methods=['PUT'])
+def marcar_mensaje_como_leido(mensaje_id):
+    """Marcar mensaje como leído"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor()
+        cursor.execute("UPDATE mensajes SET leido = 1 WHERE id = %s", (mensaje_id,))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True, 'message': 'Mensaje marcado como leído'})
+
+    except Exception as e:
+        print(f"❌ Error marcar leído: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# =====================================================
+# FAMILIA - ENDPOINTS PARA PADRES DE FAMILIA
+# =====================================================
+
+@app.route('/api/familia/dashboard/<int:familia_id>', methods=['GET'])
+def get_familia_dashboard(familia_id):
+    """Dashboard para familia - resumen de sus hijos"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        
+        # ✅ QUERY CORREGIDO para tu estructura real
+        cursor.execute("""
+            SELECT 
+                e.id,
+                e.nombre,
+                e.curso_id,
+                c.nombre as curso_nombre,
+                c.nivel,
+                c.letra
+            FROM usuarios u
+            JOIN estudiantes e ON u.estudiante_id = e.id
+            JOIN cursos c ON e.curso_id = c.id
+            WHERE u.id = %s AND u.rol = 'familia'
+        """, (familia_id,))
+        
+        estudiantes = cursor.fetchall()
+        
+        print(f"🏠 Estudiantes encontrados para familia {familia_id}: {len(estudiantes)}")
+        print(f"🏠 Datos: {estudiantes}")
+        
+        if not estudiantes:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                'success': True, 
+                'data': {
+                    'hijos': [],
+                    'total_hijos': 0
+                }
+            })
+        
+        # Para cada estudiante, obtener resumen de calificaciones
+        resumen_hijos = []
+        for estudiante in estudiantes:
+            # Promedio de calificaciones
+            cursor.execute("""
+                SELECT AVG(nota) as promedio, COUNT(*) as total_notas
+                FROM calificaciones
+                WHERE estudiante_id = %s
+            """, (estudiante['id'],))
+            
+            calificaciones = cursor.fetchone()
+            
+            # Asistencia del mes actual
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_dias,
+                    SUM(CASE WHEN estado = 'Presente' THEN 1 ELSE 0 END) as dias_presentes
+                FROM asistencia
+                WHERE estudiante_id = %s 
+                AND MONTH(fecha) = MONTH(CURDATE())
+                AND YEAR(fecha) = YEAR(CURDATE())
+            """, (estudiante['id'],))
+            
+            asistencia = cursor.fetchone()
+            
+            # Observaciones recientes
+            cursor.execute("""
+                SELECT COUNT(*) as total_observaciones
+                FROM observaciones
+                WHERE estudiante_id = %s
+                AND DATE(fecha) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+            """, (estudiante['id'],))
+            
+            observaciones = cursor.fetchone()
+            
+            resumen_hijos.append({
+                'id': estudiante['id'],
+                'nombre': estudiante['nombre'],
+                'grado': f"{estudiante['nivel']}{estudiante['letra']}" if estudiante['nivel'] and estudiante['letra'] else 'Sin grado',
+                'curso': estudiante['curso_nombre'],
+                'curso_id': estudiante['curso_id'],
+                'promedio': float(calificaciones['promedio'] or 0),
+                'total_notas': calificaciones['total_notas'] or 0,
+                'asistencia_porcentaje': (
+                    (asistencia['dias_presentes'] / asistencia['total_dias'] * 100) 
+                    if asistencia['total_dias'] > 0 else 100
+                ),
+                'dias_presentes': asistencia['dias_presentes'] or 0,
+                'total_dias': asistencia['total_dias'] or 0,
+                'observaciones_mes': observaciones['total_observaciones'] or 0
+            })
+        
+        cursor.close()
+        conn.close()
+
+        print(f"✅ Dashboard familia generado: {resumen_hijos}")
+
+        return jsonify({
+            'success': True, 
+            'data': {
+                'hijos': resumen_hijos,
+                'total_hijos': len(resumen_hijos)
+            }
+        })
+
+    except Exception as e:
+        print(f"❌ Error dashboard familia: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+
+@app.route('/api/familia/hijo-calificaciones/<int:estudiante_id>', methods=['GET'])
+def get_calificaciones_hijo(estudiante_id):
+    """Obtener calificaciones específicas de un hijo"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT 
+                c.id,
+                c.asignatura,
+                c.periodo,
+                c.nota,
+                DATE_FORMAT(c.fecha_registro, '%%Y-%%m-%%d') as fecha
+            FROM calificaciones c
+            WHERE c.estudiante_id = %s
+            ORDER BY c.fecha_registro DESC, c.asignatura
+        """, (estudiante_id,))
+        
+        calificaciones = cursor.fetchall()
+        
+        print(f"📊 Calificaciones encontradas para estudiante {estudiante_id}: {len(calificaciones)}")
+        print(f"📊 Datos: {calificaciones}")
+        
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True, 'data': calificaciones})
+
+    except Exception as e:
+        print(f"❌ Error calificaciones hijo: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/familia/hijo-asistencia/<int:estudiante_id>', methods=['GET'])
+def get_asistencia_hijo(estudiante_id):
+    """Obtener asistencia específica de un hijo"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT 
+                a.id,
+                DATE_FORMAT(a.fecha, '%%Y-%%m-%%d') as fecha,
+                a.estado,
+                a.observaciones
+            FROM asistencia a
+            WHERE a.estudiante_id = %s
+            ORDER BY a.fecha DESC
+        """, (estudiante_id,))
+        
+        asistencia = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True, 'data': asistencia})
+
+    except Exception as e:
+        print(f"❌ Error asistencia hijo: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/familia/hijo-observaciones/<int:estudiante_id>', methods=['GET'])
+def get_observaciones_hijo(estudiante_id):
+    """Obtener observaciones específicas de un hijo"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT 
+                o.id,
+                DATE_FORMAT(o.fecha, '%%Y-%%m-%%d') as fecha,
+                o.tipo,
+                o.detalle,
+                u.nombre as docente_nombre
+            FROM observaciones o
+            JOIN usuarios u ON o.docente_id = u.id
+            WHERE o.estudiante_id = %s
+            ORDER BY o.fecha DESC
+        """, (estudiante_id,))
+        
+        observaciones = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True, 'data': observaciones})
+
+    except Exception as e:
+        print(f"❌ Error observaciones hijo: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/usuarios/docentes', methods=['GET'])
+def get_docentes():
+    """Obtener usuarios docentes para mensajes"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Error BD'}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, nombre, email, rol
+            FROM usuarios
+            WHERE rol = 'docente'
+            ORDER BY nombre
+        """)
+        
+        docentes = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True, 'data': docentes})
+
+    except Exception as e:
+        print(f"❌ Error docentes: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # =====================================================
 # MAIN

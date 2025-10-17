@@ -31,7 +31,7 @@ export default function ObservadorAlumno() {
   });
 
   const [cursosOptions, setCursosOptions] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Ahora SÍ se usa en el JSX
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState('');
 
@@ -155,13 +155,11 @@ export default function ObservadorAlumno() {
     }
   ];
 
-  // ✅ Función agregar SUPER SIMPLE
   const agregar = async () => {
     console.log('🔴🔴🔴 BOTÓN PRESIONADO!!! 🔴🔴🔴');
     console.log('📝 Form completo:', form);
     console.log('👤 Usuario:', usuario);
     
-    // Validación simple
     if (!form.estudianteId || !form.detalle.trim()) {
       console.log('❌ Validación falló');
       alert('Por favor selecciona un estudiante y escribe un detalle');
@@ -188,14 +186,12 @@ export default function ObservadorAlumno() {
 
       alert('✅ Observación agregada correctamente');
       
-      // Limpiar formulario
       setForm(prev => ({ 
         ...prev, 
         detalle: '',
         estudianteId: '' 
       }));
       
-      // Recargar observaciones
       const nuevasObs = await getObservadorPorCurso(parseInt(cursoId));
       setAnotaciones(nuevasObs || []);
       
@@ -209,7 +205,6 @@ export default function ObservadorAlumno() {
 
   const cursoActual = cursosOptions.find(c => c.value === cursoId);
   
-  // Debug: Estado del botón
   const botonHabilitado = !guardando && !!form.estudianteId && !!form.detalle.trim();
   console.log('🔘 Estado del botón:', {
     habilitado: botonHabilitado,
@@ -236,7 +231,19 @@ export default function ObservadorAlumno() {
         }
       />
 
-      
+      {/* 👇 INDICADOR DE CARGA (usa la variable `loading`) */}
+      {loading && (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '2rem', 
+          backgroundColor: '#f8f9fa', 
+          borderRadius: '8px',
+          marginBottom: '1rem',
+          color: '#666'
+        }}>
+          <p>⏳ Cargando datos del curso...</p>
+        </div>
+      )}
 
       {/* Mensajes */}
       {mensaje && (
@@ -383,7 +390,6 @@ export default function ObservadorAlumno() {
               {guardando ? '⏳ Guardando...' : '📝 AGREGAR OBSERVACIÓN'}
             </button>
             
-            {/* Estado del botón */}
             <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
               Estado: <strong>{botonHabilitado ? '🟢 HABILITADO' : '🔴 DESHABILITADO'}</strong>
               <br />

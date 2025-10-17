@@ -146,3 +146,77 @@ export const getEstadisticasObservaciones = async (cursoId) => {
   console.log('🌐 API: Obteniendo estadísticas para curso:', cursoId);
   return await apiRequest(`/observaciones/estadisticas/${cursoId}`);
 };
+
+// =====================================================
+// FUNCIONES PARA MENSAJES
+// =====================================================
+
+export const getMensajesPorUsuario = async (usuarioId) => {
+  console.log('📧 API: Obteniendo mensajes para usuario:', usuarioId);
+  return await apiRequest(`/mensajes/${usuarioId}`);
+};
+
+export const getConversacion = async (usuario1Id, usuario2Id) => {
+  console.log('💬 API: Obteniendo conversación entre:', usuario1Id, 'y', usuario2Id);
+  return await apiRequest(`/conversacion/${usuario1Id}/${usuario2Id}`);
+};
+
+export const enviarMensaje = async (mensaje) => {
+  console.log('📤 API: Enviando mensaje:', mensaje);
+  return await apiRequest('/mensajes/enviar', {
+    method: 'POST',
+    body: JSON.stringify(mensaje),
+  });
+};
+
+export const marcarComoLeido = async (mensajeId) => {
+  console.log('👁️ API: Marcando mensaje como leído:', mensajeId);
+  return await apiRequest(`/mensajes/marcar-leido/${mensajeId}`, {
+    method: 'PUT',
+  });
+};
+
+export const getUsuarioPorId = async (usuarioId) => {
+  console.log('👤 API: Obteniendo usuario por ID:', usuarioId);
+  return await apiRequest(`/usuario/${usuarioId}`);
+};
+
+// ⭐ FUNCIÓN UNIFICADA - USUARIOS POR ROL (NO DUPLICADA)
+export const getUsuariosPorRol = async (rol) => {
+  console.log('👥 API: Obteniendo usuarios por rol:', rol);
+  
+  if (rol === 'familia') {
+    return await apiRequest('/usuarios/familia');
+  }
+  
+  if (rol === 'docente') {
+    return await apiRequest('/usuarios/docentes');
+  }
+  
+  // Para otros roles futuros
+  return await apiRequest(`/usuarios/por-rol/${rol}`);
+};
+
+// =====================================================
+// FUNCIONES PARA FAMILIAS
+// =====================================================
+
+export const getFamiliaDashboard = async (familiaId) => {
+  console.log('🏠 API: Dashboard familiar para ID:', familiaId);
+  return await apiRequest(`/familia/dashboard/${familiaId}`);
+};
+
+export const getCalificacionesHijo = async (estudianteId) => {
+  console.log('📊 API: Calificaciones de estudiante:', estudianteId);
+  return await apiRequest(`/familia/hijo-calificaciones/${estudianteId}`);
+};
+
+export const getAsistenciaHijo = async (estudianteId) => {
+  console.log('📅 API: Asistencia de estudiante:', estudianteId);
+  return await apiRequest(`/familia/hijo-asistencia/${estudianteId}`);
+};
+
+export const getObservacionesHijo = async (estudianteId) => {
+  console.log('📝 API: Observaciones de estudiante:', estudianteId);
+  return await apiRequest(`/familia/hijo-observaciones/${estudianteId}`);
+};

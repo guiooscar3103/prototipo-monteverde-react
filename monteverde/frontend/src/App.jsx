@@ -4,13 +4,18 @@ import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Asistencia from './pages/docente/Asistencia';
 import ObservadorAlumno from './pages/docente/ObservadorAlumno';
+import Mensajes from './pages/docente/Mensajes';
+import FamiliaHome from './pages/familia/Home';
+import FamiliaMensajes from './pages/familia/Mensajes';
+import ReporteAcademico from './pages/familia/ReporteAcademico';
 
 // Layouts
 import DocenteLayout from './layouts/DocenteLayout';
+import FamiliaLayout from './layouts/FamiliaLayout'; // ← AGREGADO
 
 // Pages
 import DocenteHome from './pages/docente/Home';
-import RegistroCalificaciones from './pages/docente/RegistroCalificaciones'; // ✅ Nuevo import
+import RegistroCalificaciones from './pages/docente/RegistroCalificaciones';
 
 // ===================================================
 // Componente para proteger rutas
@@ -65,12 +70,11 @@ function App() {
           </PrivateRoute>
         }
       >
-        {/* Rutas anidadas dentro del layout */}
         <Route index element={<DocenteHome />} />
-        <Route path="calificaciones" element={<RegistroCalificaciones />} /> {/* ✅ Actualizado */}
+        <Route path="calificaciones" element={<RegistroCalificaciones />} />
         <Route path="asistencia" element={<Asistencia />} />
         <Route path="observador" element={<ObservadorAlumno />} />
-        <Route path="mensajes" element={<div>Mensajes (Por crear)</div>} />
+        <Route path="mensajes" element={<Mensajes />} />
       </Route>
       
       {/* ======================================
@@ -89,19 +93,21 @@ function App() {
       />
       
       {/* ======================================
-          FAMILIA
+          FAMILIA - ✅ CORREGIDO
       ====================================== */}
       <Route 
-        path="/familia" 
-        element={
-          <PrivateRoute allowedRoles={['familia']}>
-            <div style={{ padding: '2rem', textAlign: 'center' }}>
-              <h1>Dashboard Familia</h1>
-              <p>Por crear FamiliaLayout + FamiliaHome</p>
-            </div>
-          </PrivateRoute>
-        } 
-      />
+      path="/familia" 
+      element={
+      <PrivateRoute allowedRoles={['familia']}>
+      <FamiliaLayout />
+      </PrivateRoute>
+      }
+      >
+      <Route index element={<FamiliaHome />} />
+      <Route path="home" element={<FamiliaHome />} />
+      <Route path="mensajes" element={<FamiliaMensajes />} />
+      <Route path="reporte" element={<ReporteAcademico />} />
+      </Route>
 
       {/* ======================================
           RAÍZ / HOME
