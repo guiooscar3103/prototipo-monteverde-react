@@ -362,10 +362,9 @@ Si seguiste todos los pasos correctamente, deberías tener:
 
 <div align="center">
 
-**🎓 Desarrollado para el curso de Ingeniería de Software**  
+**🎓 Desarrollado para el curso de Ingeniería Web II**  
 *Universidad Minuto de Dios - UNIMINUTO*
 
-**⭐ Si te ayudó este proyecto, no olvides darle una estrella**
 
 </div>
 
