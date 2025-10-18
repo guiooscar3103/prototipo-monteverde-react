@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider } from './contexts/AuthContext';
 import App from './App.jsx';
-import './styles/global.css'; // o './index.css' según tu estructura
+import './styles/global.css'; 
 
 // =========================================
 // Configuración de React Query v5
