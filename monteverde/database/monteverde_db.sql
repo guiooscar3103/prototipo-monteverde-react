@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 18-10-2025 a las 02:17:03
+-- Tiempo de generación: 18-10-2025 a las 02:20:09
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.0.30
 
@@ -203,8 +203,7 @@ INSERT INTO `observaciones` (`id`, `estudiante_id`, `docente_id`, `fecha`, `tipo
 (2, 1, 2, '2025-10-12', 'POSITIVA', 'Ayudó a sus compañeros durante el trabajo grupal.'),
 (3, 2, 2, '2025-10-11', 'NEUTRAL', 'Valentina necesita mejorar su atención en clase.'),
 (4, 3, 2, '2025-10-08', 'POSITIVA', 'Matías demostró liderazgo en el proyecto de ciencias.'),
-(5, 5, 2, '2025-10-09', 'POSITIVA', 'Lucas mejoró notablemente en lectura.'),
-(10, 1, 2, '2025-10-17', 'NEGATIVA', 'se cago en clase');
+(5, 5, 2, '2025-10-09', 'POSITIVA', 'Lucas mejoró notablemente en lectura.');
 
 -- --------------------------------------------------------
 
